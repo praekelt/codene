@@ -9,7 +9,7 @@ from twisted.web import server
 import codene
 
 class Options(usage.Options):
-    optParameters = [["port", "p", 6114, "The port to listen on."]]
+    optParameters = [["port", "p", 8080, "The port to listen on."]]
 
 
 class CodeneServiceMaker(object):
@@ -19,7 +19,7 @@ class CodeneServiceMaker(object):
     options = Options
 
     def makeService(self, options):
-        return internet.TCPServer(int(options["port"]), server.Site(codene.CodeneServer()))
+        return internet.TCPServer(int(options["port"]), server.Site(codene.Server()))
 
 
 serviceMaker = CodeneServiceMaker()
