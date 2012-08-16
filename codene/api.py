@@ -8,7 +8,14 @@ class API(object):
 
     @defer.inlineCallbacks
     def get(self, bucket, name):
-        defer.returnValue('ok')
+        meta = self.client.bucket('%s_meta' % bucket)
+        objects = self.client.bucket('%s_objects' % bucket)
+
+        metadata = (yield meta.get(name)).get_data()
+
+        metadata['object'] = (yield objects.get(metadata['link'])).get_data()
+
+        defer.returnValue(metadata)
 
     @defer.inlineCallbacks
     def put(self, bucket, name, cType, data):

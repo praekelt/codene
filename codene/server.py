@@ -15,8 +15,27 @@ class Server(resource.Resource):
 
     def render_GET(self, request):
         # For retrieving objects
+        path = request.path.strip('/')
 
-        return "codene"
+        print "Request", path 
+
+        if '/' in path:
+            bucket, name = path.split('/',1)
+        else:
+            # Should be a 404 actually... 
+            return "Invalid bucket" 
+
+        d = self.api.get(bucket, name).addCallback(
+            self.completeGet, request
+        )
+
+        return server.NOT_DONE_YET
+
+    def completeGet(self, response, request):
+        # Complete deferred request
+        request.setHeader('content-type', str(response['content-type']))
+        request.write(response['object'])
+        request.finish()
 
     def render_PUT(self, request):
         # Put an object
@@ -31,12 +50,12 @@ class Server(resource.Resource):
 
         # XXX This should stream the put into Riak somehow
         d = self.api.put(bucket, name, contentType, content.read()).addCallback(
-            self.completeCall, request
+            self.completePut, request
         )
 
         return server.NOT_DONE_YET
 
-    def completeCall(self, response, request):
+    def completePut(self, response, request):
         # Complete deferred request
         request.write(response)
         request.finish()
