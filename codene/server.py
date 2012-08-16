@@ -17,8 +17,6 @@ class Server(resource.Resource):
         # For retrieving objects
         path = request.path.strip('/')
 
-        print "Request", path 
-
         if '/' in path:
             bucket, name = path.split('/',1)
         else:
@@ -33,7 +31,13 @@ class Server(resource.Resource):
 
     def completeGet(self, response, request):
         # Complete deferred request
+
+        print repr(response)
+
         request.setHeader('content-type', str(response['content-type']))
+        request.setHeader('content-length', str(response['content-length']))
+        
+
         request.write(response['object'])
         request.finish()
 

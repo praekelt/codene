@@ -13,7 +13,7 @@ class API(object):
 
         metadata = (yield meta.get(name)).get_data()
 
-        metadata['object'] = (yield objects.get(metadata['link'])).get_data()
+        metadata['object'] = (yield objects.get_binary(metadata['link'])).get_data()
 
         defer.returnValue(metadata)
 
@@ -28,13 +28,14 @@ class API(object):
         metadata = {
             'filename': name, 
             'checksum': datahash, 
+            'content-length': len(data),
             'content-type': cType,
             'link': obref
         }
 
         objmeta = meta.new(name, metadata)
 
-        obj = objects.new(obref, data)
+        obj = objects.new_binary(obref, data)
 
         # Make sure the real object stores before we store the metadata
         yield obj.store()
