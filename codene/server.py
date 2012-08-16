@@ -32,8 +32,6 @@ class Server(resource.Resource):
     def completeGet(self, response, request):
         # Complete deferred request
 
-        print repr(response)
-
         request.setHeader('content-type', str(response['content-type']))
         request.setHeader('content-length', str(response['content-length']))
         
