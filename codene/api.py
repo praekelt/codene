@@ -1,10 +1,62 @@
 from twisted.internet import defer
 from riakasaurus import riak
-import simplejson, cgi, uuid, hashlib, time, math, os
+
+import hashlib
+import hmac
+import base64
+
+from codene import util
 
 class API(object):
     def __init__(self):
         self.client = riak.RiakClient()
+
+    def getCanonicalPath(self, request):
+        path = request.path.strip('/')
+
+        host = request.getRequestHostname()
+
+        #XXX make configurable
+        myHost = 'cdn.r53.praekelt.com'
+
+        # Add bucket name from host to path
+        path = ''
+        if host.strip(myHost):
+            bucket = host.split('.')[0]
+            path += '/'+bucket
+
+        path += request.path
+        return path
+
+    def getSignRequest(self, verb, request, secret):
+        # Creates an HMAC sig for a request
+
+        contentType = util.getHeader(request, 'content-type')
+        contentMD5 = util.getHeader(request, 'content-md5')
+
+        date = util.getHeader(request, 'date')
+        amzDate = util.getHeader(request, 'x-amz-date')
+
+        if amzDate:
+            date = 'x-amz-date:%s' % amzDate
+
+        path = self.getCanonicalPath(request)
+
+        signData = ['PUT', contentMD5, contentType, date, path]
+
+        sig = hmac.new(
+            key = secret,
+            msg = '\n'.join(signData),
+            digestmod = hashlib.sha1
+        ).digest()
+
+        return base64.b64encode(sig)
+
+    def getSecret(self, key):
+        fake = {
+            'testac': 'secret'
+        }
+        return fake[key]
 
     @defer.inlineCallbacks
     def get(self, bucket, name):
@@ -35,7 +87,7 @@ class API(object):
 
         objmeta = meta.new(name, metadata)
 
-        obj = objects.new_binary(obref, data)
+        obj = objects.new_binary(obref, data, content_type="text/binary")
 
         # Make sure the real object stores before we store the metadata
         yield obj.store()

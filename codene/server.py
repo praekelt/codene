@@ -2,11 +2,52 @@ from twisted.application import internet, service
 from twisted.web import static, server, resource, client
 from twisted.internet import defer, reactor, threads, utils
 
-import simplejson, os, cgi
+from codene import api, util
 
-from codene import api
+class CodeneMixin(object):
 
-class Server(resource.Resource):
+    def render_PUT(self, request):
+        # Put an object
+        auth = util.getHeader(request, 'authorization')
+
+        if not auth:
+            return ''
+
+        # Split the auth header 'blah key:sig' 
+        key, sig = auth.split()[-1].split(':', 1)
+
+        secret = self.api.getSecret(key)
+
+        # Get the HMAC sig we have 
+        sr = self.api.getSignRequest('PUT', request, secret)
+
+        if sr != sig:
+            return ''
+
+        content = request.content
+
+        contentType = util.getHeader(request, 'content-type', 'application/binary')
+
+        path = self.api.getCanonicalPath(request).strip('/')
+
+        # Figure out from here if it's an object put or bucket creation
+        # Amazon's API is so "awesome" that there isn't much discernible difference
+
+        if '/' in path:
+            bucket, name = path.split('/',1)
+        else:
+            return "No bucket specified"
+
+        # XXX This should stream the put into Riak somehow
+        d = self.api.put(bucket, name, contentType, content.read()).addCallback(
+            self.completeRequest, request
+        ).addErrback(
+            self.logError, request
+        )
+
+        return server.NOT_DONE_YET
+
+class Server(resource.Resource, CodeneMixin):
     isLeaf = True
     addSlash = True
 
@@ -35,29 +76,16 @@ class Server(resource.Resource):
         request.setHeader('content-type', str(response['content-type']))
         request.setHeader('content-length', str(response['content-length']))
         
-
         request.write(response['object'])
         request.finish()
 
-    def render_PUT(self, request):
-        # Put an object
-        contentType = request.requestHeaders.getRawHeaders('content-type')[0]
-        content = request.content
+    def logError(self, error, request):
+        error.printTraceback()
 
-        path = request.path.strip('/')
-        if '/' in path:
-            bucket, name = path.split('/',1)
-        else:
-            return "No bucket specified"
+        request.write("ERROR")
+        request.finish()
 
-        # XXX This should stream the put into Riak somehow
-        d = self.api.put(bucket, name, contentType, content.read()).addCallback(
-            self.completePut, request
-        )
-
-        return server.NOT_DONE_YET
-
-    def completePut(self, response, request):
+    def completeRequest(self, response, request):
         # Complete deferred request
         request.write(response)
         request.finish()
